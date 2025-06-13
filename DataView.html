@@ -1,0 +1,320 @@
+<!-- Файл: DataView.html -->
+<!DOCTYPE html>
+<html>
+<head>
+  <base target="_top">
+  <style>
+    body { font-family: Arial, sans-serif; padding: 20px; }
+    h2 { margin-bottom: 10px; }
+    .filters {
+      display: flex;
+      gap: 10px;
+      margin-bottom: 20px;
+      flex-wrap: wrap;
+    }
+    .filters select, .filters input {
+      padding: 6px;
+      font-size: 14px;
+    }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-bottom: 20px;
+    }
+    th, td {
+      border: 1px solid #ccc;
+      padding: 8px;
+      text-align: left;
+    }
+    .status-active { color: green; }
+    .status-completed { color: gray; text-decoration: line-through; }
+    .actions button {
+      margin: 2px;
+      padding: 4px 8px;
+      font-size: 12px;
+    }
+    .spinner {
+      display: none;
+      margin-top: 10px;
+      border: 4px solid #f3f3f3;
+      border-top: 4px solid #3498db;
+      border-radius: 50%;
+      width: 30px;
+      height: 30px;
+      animation: spin 1s linear infinite;
+    }
+    @keyframes spin {
+      0% { transform: rotate(0deg); }
+      100% { transform: rotate(360deg); }
+    }
+    .modal {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background-color: rgba(0,0,0,0.5);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      z-index: 1000;
+    }
+    .modal-content {
+      background-color: white;
+      padding: 20px;
+      border-radius: 5px;
+      width: 90%;
+      max-width: 800px;
+      box-shadow: 0 0 10px rgba(0,0,0,0.3);
+    }
+  </style>
+</head>
+<body>
+  <h2>База данных</h2>
+  <!-- Фильтры -->
+  <div class="filters">
+    <input type="text" id="search" placeholder="Поиск..." oninput="filterData()">
+    <select id="filterOperation" onchange="filterData()">
+      <option value="">Все операции</option>
+      <option value="продать">Продать</option>
+      <option value="купить">Купить</option>
+      <option value="сдать">Сдать</option>
+      <option value="арендовать">Арендовать</option>
+    </select>
+  </div>
+  <!-- Таблица данных -->
+  <div id="tableContainer">
+    <table id="dataTable">
+      <thead>
+        <tr>
+          <th>ID</th>
+          <th>Операция</th>
+          <th>Тип</th>
+          <th>Адрес</th>
+          <th>Цена</th>
+          <th>Кто</th>
+          <th>Имя</th>
+          <th>Телефон</th>
+          <th>Статус</th>
+          <th>Ответственный</th>
+          <th>Описание</th>
+          <th>Действия</th>
+        </tr>
+      </thead>
+      <tbody id="dataBody">
+        <!-- Данные будут вставлены здесь -->
+      </tbody>
+    </table>
+  </div>
+  <div class="spinner" id="loadingSpinner"></div>
+  <!-- Модальное окно для выбора сделки -->
+  <div id="dealModal" class="modal" style="display:none;">
+    <div class="modal-content">
+      <h3>Создать сделку</h3>
+      <div id="dealMatches"></div>
+      <button onclick="closeDealModal()">Закрыть</button>
+    </div>
+  </div>
+  <script>
+    let allData = [];
+    let currentDealId = null;
+    // Инициализация
+    document.addEventListener('DOMContentLoaded', () => {
+      showLoading(true);
+      google.script.run
+        .withSuccessHandler(data => {
+          allData = data.filter(row => row[8] === 'активно'); // Фильтруем только активные записи
+          renderTable(allData);
+          showLoading(false);
+        })
+        .getAllData();
+    });
+    // Отображение/скрытие спиннера
+    function showLoading(show) {
+      document.getElementById('loadingSpinner').style.display = show ? 'block' : 'none';
+    }
+    // Отображение данных в таблице
+    function renderTable(data) {
+      const tbody = document.getElementById('dataBody');
+      tbody.innerHTML = '';
+      if (data.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="12" style="text-align:center;">Нет данных</td></tr>';
+        return;
+      }
+      data.forEach(row => {
+        const tr = document.createElement('tr');
+        // ID
+        tr.innerHTML += `<td>${row[0]}</td>`;
+        // Операция
+        tr.innerHTML += `<td>${row[1]}</td>`;
+        // Тип
+        tr.innerHTML += `<td>${row[2]}</td>`;
+        // Адрес
+        tr.innerHTML += `<td title="${row[3]}">${row[3].substring(0, 20)}${row[3].length > 20 ? '...' : ''}</td>`;
+        // Цена
+        tr.innerHTML += `<td>${row[4]}</td>`;
+        // Кто
+        tr.innerHTML += `<td>${row[5]}</td>`;
+        // Имя
+        tr.innerHTML += `<td>${row[6]}</td>`;
+        // Телефон
+        tr.innerHTML += `<td>${row[7]}</td>`;
+        // Статус
+        tr.innerHTML += `<td class="status-${row[8].toLowerCase()}">${row[8]}</td>`;
+        // Ответственный
+        tr.innerHTML += `<td>${row[9]}</td>`;
+        // Описание
+        tr.innerHTML += `<td title="${row[10]}">${row[10].substring(0, 30)}${row[10].length > 30 ? '...' : ''}</td>`;
+        // Действия
+        tr.innerHTML += `
+          <td class="actions">
+            <button onclick="changeStatus(${row[0]}, 'завершено')">Завершить</button>
+            <button onclick="openDealModal(${row[0]})">Сделка</button>
+          </td>
+        `;
+        tbody.appendChild(tr);
+      });
+    }
+    // Открытие модального окна для сделки
+    function openDealModal(id) {
+      currentDealId = id;
+      showLoading(true);
+      google.script.run
+        .withSuccessHandler(matches => {
+          showDealMatches(matches);
+          document.getElementById('dealModal').style.display = 'flex';
+          showLoading(false);
+        })
+        .withFailureHandler(() => {
+          alert('Ошибка при поиске подходящих записей');
+          showLoading(false);
+        })
+        .findMatchingRecords(id);
+    }
+    // Отображение подходящих записей для сделки
+    function showDealMatches(matches) {
+      const container = document.getElementById('dealMatches');
+      container.innerHTML = '';
+      if (matches.length === 0) {
+        container.innerHTML = '<p>Нет подходящих записей для сделки</p>';
+        return;
+      }
+      matches.forEach(match => {
+        const div = document.createElement('div');
+        div.innerHTML = `
+          <div style="border-bottom: 1px solid #ccc; padding: 10px 0;">
+            <strong>ID ${match.id}</strong> - ${match.operation} ${match.propertyType}<br>
+            <em>${match.address}</em><br>
+            <small>
+              ${match.name} | ${match.phone} | Цена: ${match.price} | 
+              Кто: ${match.whoWillLive} | Ответственный: ${match.responsible}
+            </small><br>
+            <button onclick="createNewDeal(${currentDealId}, ${match.id})">Выбрать</button>
+          </div>
+        `;
+        container.appendChild(div);
+      });
+    }
+    // Закрытие модального окна
+    function closeDealModal() {
+      document.getElementById('dealModal').style.display = 'none';
+    }
+    // Создание новой сделки
+    function createNewDeal(sellerId, buyerId) {
+      if (!confirm('Вы уверены, что хотите создать сделку между этими записями?')) return;
+      showLoading(true);
+      // Получаем данные записей
+      const seller = allData.find(r => r[0] === sellerId);
+      const buyer = allData.find(r => r[0] === buyerId);
+      // Определяем, кто является продавцом/арендодателем
+      let side1Data, side2Data;
+      if (
+        (seller[1] === "продать" || seller[1] === "сдать") &&
+        (buyer[1] === "купить" || buyer[1] === "арендовать")
+      ) {
+        side1Data = seller;
+        side2Data = buyer;
+      } else if (
+        (buyer[1] === "продать" || buyer[1] === "сдать") &&
+        (seller[1] === "купить" || seller[1] === "арендовать")
+      ) {
+        side1Data = buyer;
+        side2Data = seller;
+      } else {
+        alert("Несоответствие операций между сторонами");
+        showLoading(false);
+        return;
+      }
+      // Формируем данные для сделки
+      const dealData = {
+        sellerId: side1Data[0],
+        sellerOperation: side1Data[1],
+        sellerName: side1Data[6],
+        sellerPhone: side1Data[7],
+        sellerResponsible: side1Data[9],
+        buyerId: side2Data[0],
+        buyerOperation: side2Data[1],
+        buyerName: side2Data[6],
+        buyerPhone: side2Data[7],
+        buyerResponsible: side2Data[9],
+        price: side1Data[4],
+        propertyType: side1Data[2],
+        address: side1Data[3]
+      };
+      google.script.run
+        .withSuccessHandler(() => {
+          alert('Сделка успешно создана');
+          closeDealModal();
+          refreshData();
+        })
+        .withFailureHandler((error) => {
+          alert(`Ошибка при создании сделки: ${error.message}`);
+          showLoading(false);
+        })
+        .createDeal(dealData);
+    }
+    // Фильтрация данных
+    function filterData() {
+      const search = document.getElementById('search').value.toLowerCase();
+      const filterOperation = document.getElementById('filterOperation').value;
+      const filtered = allData.filter(row => {
+        const matchesSearch = 
+          row[1].toLowerCase().includes(search) || 
+          row[2].toLowerCase().includes(search) || 
+          row[3].toLowerCase().includes(search) || 
+          row[6].toLowerCase().includes(search) || 
+          row[10].toLowerCase().includes(search);
+        const matchesOperation = filterOperation ? row[1] === filterOperation : true;
+        return matchesSearch && matchesOperation;
+      });
+      renderTable(filtered);
+    }
+    // Изменение статуса
+    function changeStatus(id, newStatus) {
+      if (!confirm(`Изменить статус на "${newStatus}"?`)) return;
+      showLoading(true);
+      google.script.run
+        .withSuccessHandler(() => {
+          alert('Статус успешно изменен');
+          refreshData();
+        })
+        .withFailureHandler(() => {
+          alert('Ошибка при изменении статуса');
+          showLoading(false);
+        })
+        .updateStatus(id, newStatus);
+    }
+    // Обновление данных
+    function refreshData() {
+      showLoading(true);
+      google.script.run
+        .withSuccessHandler(data => {
+          allData = data.filter(row => row[8] === 'активно'); // Фильтруем только активные записи
+          renderTable(allData);
+          showLoading(false);
+        })
+        .getAllData();
+    }
+  </script>
+</body>
+</html>
