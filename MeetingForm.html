@@ -1,0 +1,426 @@
+<!-- MeetingForm.html -->
+<!DOCTYPE html>
+<html>
+<head>
+  <base target="_top">
+  <style>
+    body { font-family: Arial, sans-serif; padding: 20px; }
+    h2 { margin-bottom: 10px; }
+    .filters {
+      display: flex;
+      gap: 10px;
+      margin-bottom: 20px;
+      flex-wrap: wrap;
+    }
+    .filters input, .filters select {
+      padding: 6px;
+      font-size: 14px;
+    }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-bottom: 20px;
+    }
+    th, td {
+      border: 1px solid #ccc;
+      padding: 8px;
+      text-align: left;
+    }
+    .status-active { color: green; }
+    .status-assigned { color: orange; }
+    .status-completed { color: gray; text-decoration: line-through; }
+    .actions button {
+      margin: 2px;
+      padding: 4px 8px;
+      font-size: 12px;
+    }
+    .spinner {
+      display: none;
+      margin-top: 10px;
+      border: 4px solid #f3f3f3;
+      border-top: 4px solid #3498db;
+      border-radius: 50%;
+      width: 30px;
+      height: 30px;
+      animation: spin 1s linear infinite;
+    }
+    @keyframes spin {
+      0% { transform: rotate(0deg); }
+      100% { transform: rotate(360deg); }
+    }
+    .modal {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background-color: rgba(0,0,0,0.5);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      z-index: 1000;
+    }
+    .modal-content {
+      background-color: white;
+      padding: 20px;
+      border-radius: 5px;
+      width: 90%;
+      max-width: 800px;
+      box-shadow: 0 0 10px rgba(0,0,0,0.3);
+    }
+  </style>
+</head>
+<body>
+  <h2>Сделки</h2>
+  <!-- Фильтры -->
+  <div class="filters">
+    <input type="text" id="search" placeholder="Поиск..." oninput="filterData()">
+    <select id="filterResponsible" onchange="filterData()">
+      <option value="">Все ответственные</option>
+    </select>
+    <select id="filterStatus" onchange="filterData()">
+      <option value="">Все статусы</option>
+      <option value="активно">Активно</option>
+      <option value="назначено">Назначено</option>
+      <option value="состоялось">Состоялось</option>
+      <option value="не состоялось">Не состоялось</option>
+    </select>
+  </div>
+  <!-- Таблица данных -->
+  <div id="tableContainer">
+    <table id="dataTable">
+      <thead>
+        <tr>
+          <th>ID</th>
+          <th>Тип сделки</th>
+          <th>ID Стороны 1</th>
+          <th>Сторона 1</th>
+          <th>Телефон Стороны 1</th>
+          <th>ID Стороны 2</th>
+          <th>Сторона 2</th>
+          <th>Телефон Стороны 2</th>
+          <th>Цена</th>
+          <th>Тип недвижимости</th>
+          <th>Адрес</th>
+          <th>Статус</th>
+          <th>Ответственный</th>
+          <th>Действия</th>
+        </tr>
+      </thead>
+      <tbody id="dataBody">
+        <!-- Данные будут вставлены здесь -->
+      </tbody>
+    </table>
+  </div>
+  <div class="spinner" id="loadingSpinner"></div>
+  <script>
+    let allDeals = [];
+
+    // Инициализация
+    document.addEventListener('DOMContentLoaded', () => {
+      showLoading(true);
+      google.script.run
+        .withSuccessHandler(data => {
+          allDeals = data;
+          populateResponsibleFilter(allDeals);
+          renderTable(allDeals);
+          showLoading(false);
+        })
+        .getAllDeals();
+    });
+
+    // Отображение/скрытие спиннера
+    function showLoading(show) {
+      document.getElementById('loadingSpinner').style.display = show ? 'block' : 'none';
+    }
+
+    // Заполнение фильтра "Ответственный"
+    function populateResponsibleFilter(deals) {
+      const filter = document.getElementById('filterResponsible');
+      filter.innerHTML = '<option value="">Все ответственные</option>';
+      const allResponsibles = [];
+      deals.forEach(deal => {
+        if (deal[12]) {
+          const responsibles = deal[12].split(',').map(r => r.trim());
+          responsibles.forEach(r => {
+            if (r && !allResponsibles.includes(r)) {
+              allResponsibles.push(r);
+            }
+          });
+        }
+      });
+      allResponsibles.sort().forEach(responsible => {
+        const option = document.createElement('option');
+        option.value = responsible;
+        option.textContent = responsible;
+        filter.appendChild(option);
+      });
+    }
+
+    // Отображение данных в таблице
+    function renderTable(data) {
+      const tbody = document.getElementById('dataBody');
+      tbody.innerHTML = '';
+      if (data.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="14" style="text-align:center;">Нет данных</td></tr>';
+        return;
+      }
+      data.forEach(row => {
+        const tr = document.createElement('tr');
+        // ID
+        tr.innerHTML += `<td>${row[0]}</td>`;
+        // Тип сделки
+        tr.innerHTML += `<td>${row[1]}</td>`;
+        // ID Стороны 1
+        tr.innerHTML += `<td>${row[2]}</td>`;
+        // Сторона 1
+        tr.innerHTML += `<td>${row[3]}</td>`;
+        // Телефон Стороны 1
+        tr.innerHTML += `<td>${row[4]}</td>`;
+        // ID Стороны 2
+        tr.innerHTML += `<td>${row[5]}</td>`;
+        // Сторона 2
+        tr.innerHTML += `<td>${row[6]}</td>`;
+        // Телефон Стороны 2
+        tr.innerHTML += `<td>${row[7]}</td>`;
+        // Цена
+        tr.innerHTML += `<td>${row[8]}</td>`;
+        // Тип недвижимости
+        tr.innerHTML += `<td>${row[9]}</td>`;
+        // Адрес
+        tr.innerHTML += `<td title="${row[10]}">${row[10].substring(0, 20)}${row[10].length > 20 ? '...' : ''}</td>`;
+        // Статус
+        tr.innerHTML += `<td class="status-${row[11].toLowerCase()}">${row[11]}</td>`;
+        // Ответственный
+        tr.innerHTML += `<td>${row[12]}</td>`;
+        // Действия
+        tr.innerHTML += `
+          <td class="actions">
+            ${row[11] === "активно" ? `<button onclick="scheduleMeeting(${row[0]})">Назначить встречу</button>` : ''}
+            ${row[11] === "назначено" ? `<button onclick="rescheduleMeeting(${row[0]})">Перенести</button><button onclick="completeMeeting(${row[0]})">Завершить</button>` : ''}
+          </td>
+        `;
+        tbody.appendChild(tr);
+      });
+    }
+
+    // Фильтрация данных
+    function filterData() {
+      const search = document.getElementById('search').value.toLowerCase();
+      const filterResponsible = document.getElementById('filterResponsible').value;
+      const filterStatus = document.getElementById('filterStatus').value;
+      const filtered = allDeals.filter(row => {
+        const matchesSearch = 
+          row[1].toLowerCase().includes(search) || 
+          row[3].toLowerCase().includes(search) || 
+          row[6].toLowerCase().includes(search) || 
+          row[9].toLowerCase().includes(search) || 
+          row[10].toLowerCase().includes(search) || 
+          row[12].toLowerCase().includes(search);
+        const matchesResponsible = filterResponsible ? 
+          row[12].split(',').map(r => r.trim().toLowerCase()).includes(filterResponsible.toLowerCase()) : true;
+        const matchesStatus = filterStatus ? row[11] === filterStatus : true;
+        return matchesSearch && matchesResponsible && matchesStatus;
+      });
+      renderTable(filtered);
+    }
+
+    // Назначить встречу
+    function scheduleMeeting(dealId) {
+      const modal = document.createElement('div');
+      modal.className = 'modal';
+      modal.innerHTML = `
+        <div class="modal-content">
+          <h3>Назначить встречу</h3>
+          <label>Процент агентских:
+            <select id="commissionPercent">
+              <option value="3">3%</option>
+              <option value="5">5%</option>
+              <option value="50">50%</option>
+              <option value="75">75%</option>
+            </select>
+          </label>
+          <label>Дата встречи:
+            <input type="datetime-local" id="meetingDate">
+          </label>
+          <button onclick="saveMeeting(${dealId})">Сохранить</button>
+          <button onclick="closeModal()">Отменить</button>
+        </div>
+      `;
+      document.body.appendChild(modal);
+    }
+
+    // Сохранить встречу
+    function saveMeeting(dealId) {
+      const percent = document.getElementById('commissionPercent').value;
+      const dateStr = document.getElementById('meetingDate').value;
+
+      if (!percent || !dateStr) {
+        alert('Пожалуйста, заполните все поля');
+        return;
+      }
+
+      const meetingData = {
+        dealId: dealId,
+        commissionPercent: parseInt(percent),
+        meetingDate: dateStr
+      };
+
+      google.script.run
+        .withSuccessHandler(() => {
+          alert('Встреча успешно назначена');
+          closeModal();
+          refreshData();
+        })
+        .withFailureHandler((error) => {
+          alert('Ошибка: ' + error.message);
+          closeModal();
+        })
+        .scheduleMeeting(meetingData);
+    }
+
+    // Перенести встречу
+    function rescheduleMeeting(dealId) {
+      const modal = document.createElement('div');
+      modal.className = 'modal';
+      modal.innerHTML = `
+        <div class="modal-content">
+          <h3>Перенести встречу</h3>
+          <label>Новая дата встречи:
+            <input type="datetime-local" id="newMeetingDate">
+          </label>
+          <button onclick="updateMeetingDate(${dealId})">Сохранить</button>
+          <button onclick="closeModal()">Отменить</button>
+        </div>
+      `;
+      document.body.appendChild(modal);
+    }
+
+    // Обновить дату встречи
+function updateMeetingDate(dealId) {
+  const newDate = document.getElementById('newMeetingDate').value;
+
+  if (!newDate) {
+    alert('Пожалуйста, выберите новую дату');
+    return;
+  }
+
+  // Сначала получаем ID встречи по ID сделки
+  google.script.run
+    .withSuccessHandler(meetingId => {
+      if (!meetingId) {
+        alert('Встреча не найдена для этой сделки');
+        closeModal();
+        return;
+      }
+
+      // Затем обновляем дату встречи
+      google.script.run
+        .withSuccessHandler(() => {
+          alert('Дата встречи успешно обновлена');
+          closeModal();
+          refreshData();
+        })
+        .withFailureHandler((error) => {
+          alert('Ошибка при обновлении даты: ' + error.message);
+          closeModal();
+        })
+        .updateMeetingDate({
+          meetingId: meetingId,
+          newDate: newDate
+        });
+    })
+    .withFailureHandler((error) => {
+      alert('Ошибка при получении ID встречи: ' + error.message);
+      closeModal();
+    })
+    .getMeetingIdByDealId(dealId);
+}
+
+// Завершить встречу
+function finalizeMeeting(dealId) {
+  const success = document.getElementById('meetingResult').value;
+  const reason = document.getElementById('reason') ? document.getElementById('reason').value : "";
+
+  // Сначала получаем ID встречи по ID сделки
+  google.script.run
+    .withSuccessHandler(meetingId => {
+      if (!meetingId) {
+        alert('Встреча не найдена для этой сделки');
+        closeModal();
+        return;
+      }
+
+      // Затем завершаем встречу
+      google.script.run
+        .withSuccessHandler(() => {
+          alert('Встреча завершена');
+          closeModal();
+          refreshData();
+        })
+        .withFailureHandler((error) => {
+          alert('Ошибка при завершении встречи: ' + error.message);
+          closeModal();
+        })
+        .completeMeeting({
+          meetingId: meetingId,
+          success: success,
+          reason: reason
+        });
+    })
+    .withFailureHandler((error) => {
+      alert('Ошибка при получении ID встречи: ' + error.message);
+      closeModal();
+    })
+    .getMeetingIdByDealId(dealId);
+}
+
+    // Завершить встречу
+    function completeMeeting(dealId) {
+      const modal = document.createElement('div');
+      modal.className = 'modal';
+      modal.innerHTML = `
+        <div class="modal-content">
+          <h3>Завершить встречу</h3>
+          <label>Встреча состоялась?
+            <select id="meetingResult">
+              <option value="да">Да</option>
+              <option value="нет">Нет</option>
+            </select>
+          </label>
+          <div id="reasonContainer" style="display:none;">
+            <label>Почему сделка не состоялась?
+              <textarea id="reason"></textarea>
+            </label>
+          </div>
+          <button onclick="finalizeMeeting(${dealId})">Завершить</button>
+          <button onclick="closeModal()">Отменить</button>
+        </div>
+      `;
+      document.body.appendChild(modal);
+
+      document.getElementById('meetingResult').addEventListener('change', function() {
+        document.getElementById('reasonContainer').style.display = this.value === "нет" ? 'block' : 'none';
+      });
+    }
+
+    // Закрыть модальное окно
+    function closeModal() {
+      document.querySelector('.modal').remove();
+    }
+
+    // Обновление данных
+    function refreshData() {
+      showLoading(true);
+      google.script.run
+        .withSuccessHandler(data => {
+          allDeals = data;
+          populateResponsibleFilter(allDeals);
+          renderTable(allDeals);
+          showLoading(false);
+        })
+        .getAllDeals();
+    }
+  </script>
+</body>
+</html>
