@@ -1,0 +1,125 @@
+<!-- Файл: Form.html -->
+<!DOCTYPE html>
+<html>
+<head>
+  <base target="_top">
+  <style>
+    body { font-family: Arial, sans-serif; padding: 20px; }
+    h3 { margin-bottom: 15px; }
+    label { display: block; margin: 10px 0 5px; }
+    input, select, textarea {
+      width: 100%;
+      padding: 8px;
+      margin-bottom: 10px;
+      box-sizing: border-box;
+    }
+    button {
+      padding: 12px 25px;
+      background-color: #4CAF50;
+      color: white;
+      border: none;
+      border-radius: 4px;
+      cursor: pointer;
+      margin-top: 20px;
+    }
+    button:hover {
+      background-color: #45a049;
+    }
+    .spinner {
+      display: none;
+      margin-top: 10px;
+      border: 4px solid #f3f3f3;
+      border-top: 4px solid #3498db;
+      border-radius: 50%;
+      width: 30px;
+      height: 30px;
+      animation: spin 1s linear infinite;
+    }
+    @keyframes spin {
+      0% { transform: rotate(0deg); }
+      100% { transform: rotate(360deg); }
+    }
+  </style>
+</head>
+<body>
+  <h3>Добавить запись</h3>
+  <form id="realEstateForm">
+    <label>Операция:
+      <select name="operation">
+        <option value="продать">Продать</option>
+        <option value="купить">Купить</option>
+        <option value="сдать">Сдать</option>
+        <option value="арендовать">Арендовать</option>
+      </select>
+    </label>
+    <label>Тип недвижимости:
+      <select name="propertyType">
+        <option value="1к.кв.">1к.кв.</option>
+        <option value="2к.кв.">2к.кв.</option>
+        <option value="3к.кв.">3к.кв.</option>
+        <option value="4к.кв.">4к.кв.</option>
+        <option value="Комната">Комната</option>
+        <option value="Дом">Дом</option>
+        <option value="Дача">Дача</option>
+        <option value="Коттедж">Коттедж</option>
+        <option value="Земельный участок">Земельный участок</option>
+        <option value="Гараж">Гараж</option>
+        <option value="Машиноместо">Машиноместо</option>
+        <option value="Офис">Офис</option>
+        <option value="Комерч. Свободного назначения">Комерч. Свободного назначения</option>
+        <option value="Торговая площадь">Торговая площадь</option>
+        <option value="Склад">Склад</option>
+        <option value="Производство">Производство</option>
+        <option value="Общепит">Общепит</option>
+        <option value="Гостиница">Гостиница</option>
+        <option value="Автосервис">Автосервис</option>
+        <option value="Здание">Здание</option>
+      </select>
+    </label>
+    <label>Адрес: <input type="text" name="address"></label>
+    <label>Цена: <input type="number" name="price" required></label>
+    <label>Кто будет жить:
+      <select name="who_will_live">
+        <option value="не важно">Не важно</option>
+        <option value="мужчина">Мужчина</option>
+        <option value="женщина">Женщина</option>
+        <option value="пара">Пара</option>
+        <option value="семья">Семья</option>
+        <option value="организация">Организация</option>
+        <option value="снг">СНГ</option>
+      </select>
+    </label>
+    <label>Имя: <input type="text" name="name" required></label>
+    <label>Телефон: <input type="text" name="phone" required></label>
+    <label>Ответственный:
+      <select name="responsible" required>
+        <option value="Владимир Канкасов">Владимир Канкасов</option>
+        <option value="Алла Старун">Алла Старун</option>
+        <option value="Владимир">Владимир</option>
+        <option value="Татьяна Иванова">Татьяна Иванова</option>
+      </select>
+    </label>
+    <label>Описание: <textarea name="description"></textarea></label>
+    <button type="submit">Добавить запись</button>
+    <div class="spinner" id="loadingSpinner"></div>
+  </form>
+  <script>
+    document.getElementById('realEstateForm').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const formData = new FormData(e.target);
+      const data = {};
+      formData.forEach((value, key) => data[key] = value);
+      document.getElementById('loadingSpinner').style.display = 'block';
+      try {
+        await google.script.run.addData(data);
+        alert('Запись успешно добавлена!');
+        e.target.reset();
+      } catch (error) {
+        alert('Произошла ошибка: ' + error.message);
+      } finally {
+        document.getElementById('loadingSpinner').style.display = 'none';
+      }
+    });
+  </script>
+</body>
+</html>
